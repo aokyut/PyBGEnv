@@ -7,5 +7,5 @@ from numpy import get_include # cimport numpy を使うため
 
 ox = Extension("PyBGEnv.ox", sources=["ox/ox.pyx"], include_dirs=['.', get_include()])
 qubic = Extension("PyBGEnv.qubic", sources=["qubic/qubic.pyx"], include_dirs=['.', get_include()])
-setup(name="PyBGEnv", 
+setup(name="PyBGEnv",
     ext_modules=cythonize([ox, qubic]))

@@ -4,8 +4,8 @@
 # cython: cdivision=True
 import cython
 import numpy as np
+import random
 cimport numpy as cnp
-from cpython cimport array
 
 ctypedef cnp.uint8_t b_t
 ctypedef unsigned char u8
@@ -54,20 +54,23 @@ cpdef inline cnp.ndarray[b_t, ndim=1] get_next(cnp.ndarray[b_t, ndim=1] b, int a
 @cython.boundscheck(False)
 cpdef inline u8 is_win(cnp.ndarray[b_t, ndim=1] b, player):
     cdef int i, n, m, l
-    cdef cnp.ndarray[b_t, ndim=1] tar_arr, x, y, z, xy, yx, xz, zx, yz, zy
-    x = np.zeros(16, dtype=np.uint8)
-    y = np.zeros(16, dtype=np.uint8)
-    z = np.zeros(16, dtype=np.uint8)
-    xy = np.zeros(4, dtype=np.uint8)
-    yx = np.zeros(4, dtype=np.uint8)
-    xz = np.zeros(4, dtype=np.uint8)
-    zx = np.zeros(4, dtype=np.uint8)
-    yz = np.zeros(4, dtype=np.uint8)
-    zy = np.zeros(4, dtype=np.uint8)
+    cdef cnp.ndarray[b_t, ndim=1] tar_arr, y, z, xy, yx, xz, zx, yz, zy
+    cdef u8 x[16], y[16], z[16], xy[4], yx[4], xz[4], zx[4], yz[4], zy[4], tar_arr[64]
+    #x = np.zeros(16, dtype=np.uint8)
+    #y = np.zeros(16, dtype=np.uint8)
+    #z = np.zeros(16, dtype=np.uint8)
+    #xy = np.zeros(4, dtype=np.uint8)
+    #yx = np.zeros(4, dtype=np.uint8)
+    #xz = np.zeros(4, dtype=np.uint8)
+    #zx = np.zeros(4, dtype=np.uint8)
+    #yz = np.zeros(4, dtype=np.uint8)
+    #zy = np.zeros(4, dtype=np.uint8)
     if player == 0:
-        tar_arr = b[0:64]
+        for i in range(64):
+            tar_arr[i] = b[i]
     else:
-        tar_arr = b[64: 128]
+        for i in range(64):
+            tar_arr[i] = b[i + 64]
     for i in range(64):
         n = i // 16
         l = i % 4
@@ -163,3 +166,65 @@ cpdef inline str hash(cnp.ndarray[b_t, ndim=1] b):
             pack = 0
         #s += str(b[i])
     return s
+
+cdef inline u8 __is_valid_action(cnp.ndarray[b_t, ndim=1] b, action):
+    return b[action + 48] | b[action + 112]
+
+cdef inline int __minimax(cnp.ndarray[b_t, ndim=1] b, int player, int rec, int depth):
+    cdef int action, val, max_val = -2
+    cdef cnp.ndarray[b_t, ndim=1] next_b
+
+    for action in range(16):
+        if not __is_valid_action(b, action): continue
+        next_b = get_next(b, action, player)
+        # 勝った時
+        if is_win(next_b, player):
+            val = 1
+            return 1
+        # 引き分けの時
+        if is_draw(next_b):
+            val = 0
+        # どちらでも無い（勝敗が決まっていない時)
+        else:
+            if rec < depth:
+                val = -__minimax(next_b, 1 - player, rec + 1, depth)
+            else:
+                val = 0
+        if max_val < val:
+            max_val = val
+    return max_val
+
+cpdef inline int minimax_action(cnp.ndarray[b_t, ndim=1] b, int player, int depth):
+    cdef cnp.ndarray[b_t, ndim=1] vals, next_b
+    cdef cnp.ndarray[cnp.int64_t, ndim=1] max_actions
+    cdef int action, max_val=-2, max_val_count=16, val, i
+    vals = np.zeros(16, dtype=np.uint8)
+    
+    for action in range(16):
+        vals[action] = -2
+        if not __is_valid_action(b, action): continue
+        next_b = get_next(b, action, player)
+        if is_win(next_b, player): return action
+        if is_draw(next_b): return action
+        if depth == 0: continue
+        val = -__minimax(next_b, 1-player, 0, depth - 1)
+        if val == 1: return action
+        if max_val < val:
+            max_val = val
+            max_val_count = 1
+        elif max_val == val:
+            max_val_count += 1
+        vals[action] = val
+    
+    i = 0
+    max_actions = np.zeros(max_val_count, dtype=np.int64)
+    for action in range(16):
+        if vals[action] == max_val:
+            max_actions[i] = action
+            i += 1
+    
+    return random.choice(max_actions)
+
+
+
+        
