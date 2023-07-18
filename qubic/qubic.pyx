@@ -54,7 +54,6 @@ cpdef inline cnp.ndarray[b_t, ndim=1] get_next(cnp.ndarray[b_t, ndim=1] b, int a
 @cython.boundscheck(False)
 cpdef inline u8 is_win(cnp.ndarray[b_t, ndim=1] b, player):
     cdef int i, n, m, l
-    cdef cnp.ndarray[b_t, ndim=1] tar_arr, y, z, xy, yx, xz, zx, yz, zy
     cdef u8 x[16], y[16], z[16], xy[4], yx[4], xz[4], zx[4], yz[4], zy[4], tar_arr[64]
     #x = np.zeros(16, dtype=np.uint8)
     #y = np.zeros(16, dtype=np.uint8)
