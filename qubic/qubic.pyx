@@ -11,7 +11,7 @@ ctypedef cnp.uint8_t b_t
 ctypedef unsigned char u8
 ctypedef unsigned long long ull
 
-cdef int action_num = 16
+action_num = 16
 
 cdef inline cnp.ndarray[b_t, ndim=1] copy(cnp.ndarray[b_t, ndim=1] b):
     cdef cnp.ndarray[b_t, ndim=1] b_
