@@ -51,70 +51,6 @@ cpdef inline cnp.ndarray[b_t, ndim=1] get_next(cnp.ndarray[b_t, ndim=1] b, int a
     next_b[pos] = 1
     return next_b
 
-cpdef inline u8 is_win_np(cnp.ndarray[b_t, ndim=1] b, player):
-    cdef int i, n, m, l
-    cdef cnp.ndarray[b_t, ndim=1] x, y, z, xy, yx, xz, zx, yz, zy, tar_arr
-
-    x = np.zeros(16, dtype=np.uint8)
-    y = np.zeros(16, dtype=np.uint8)
-    z = np.zeros(16, dtype=np.uint8)
-    xy = np.zeros(4, dtype=np.uint8)
-    yx = np.zeros(4, dtype=np.uint8)
-    xz = np.zeros(4, dtype=np.uint8)
-    zx = np.zeros(4, dtype=np.uint8)
-    yz = np.zeros(4, dtype=np.uint8)
-    zy = np.zeros(4, dtype=np.uint8)
-    tar_arr = np.zeros(64, dtype=np.uint8)
-    
-    if player == 0:
-        for i in range(64):
-            tar_arr[i] = b[i]
-    else:
-        for i in range(64):
-            tar_arr[i] = b[i + 64]
-    for i in range(64):
-        n = i // 16
-        l = i % 4
-        m = ((i % 16) // 4)
-        if tar_arr[i] == 0: continue
-        x[4*m + l] += 1
-        y[4*n + l] += 1
-        z[4*n + m] += 1
-        if n == m:
-            xy[l] += 1
-        elif n + m == 4:
-            yx[l] += 1
-        if n == l:
-            xz[m] += 1
-        elif n + l == 4:
-            zx[m] += 1
-        if m == l:
-            yz[n] += 1
-        elif l + m == 4:
-            zy[n] += 1
-    print(x, y, z)
-    print(xy, yx, xz, zx, yz, zy)
-    for i in range(16):
-        if x[i] == 4: return 1
-        if y[i] == 4: return 1
-        if z[i] == 4: return 1
-    for i in range(4):
-        if xy[i] == 4: return 1
-        if yx[i] == 4: return 1
-        if xz[i] == 4: return 1
-        if zx[i] == 4: return 1
-        if yz[i] == 4: return 1
-        if zy[i] == 4: return 1
-    if (tar_arr[0] & tar_arr[21] & tar_arr[42] & tar_arr[63]) == 1:
-        return 1
-    if (tar_arr[3] & tar_arr[22] & tar_arr[41] & tar_arr[60]) == 1:
-        return 1
-    if (tar_arr[12] & tar_arr[25] & tar_arr[38] & tar_arr[51]) == 1:
-        return 1
-    if (tar_arr[15] & tar_arr[26] & tar_arr[37] & tar_arr[48]) == 1:
-        return 1
-    return 0
-
 cpdef inline u8 is_win(cnp.ndarray[b_t, ndim=1] b, player):
     cdef int i, n, m, l
     cdef u8[16] x, y, z
@@ -247,7 +183,7 @@ cpdef inline str hash(cnp.ndarray[b_t, ndim=1] b):
         #s += str(b[i])
     return s
 
-cdef inline u8 __is_valid_action(cnp.ndarray[b_t, ndim=1] b, action):
+cdef inline u8 __is_invalid_action(cnp.ndarray[b_t, ndim=1] b, action):
     return b[action + 48] | b[action + 112]
 
 cdef inline int __minimax(cnp.ndarray[b_t, ndim=1] b, int player, int rec, int depth):
@@ -255,7 +191,7 @@ cdef inline int __minimax(cnp.ndarray[b_t, ndim=1] b, int player, int rec, int d
     cdef cnp.ndarray[b_t, ndim=1] next_b
 
     for action in range(16):
-        if not __is_valid_action(b, action): continue
+        if __is_invalid_action(b, action): continue
         next_b = get_next(b, action, player)
         # 勝った時
         if is_win(next_b, player):
@@ -272,17 +208,20 @@ cdef inline int __minimax(cnp.ndarray[b_t, ndim=1] b, int player, int rec, int d
                 val = 0
         if max_val < val:
             max_val = val
+    
     return max_val
 
 cpdef inline int minimax_action(cnp.ndarray[b_t, ndim=1] b, int player, int depth):
-    cdef cnp.ndarray[b_t, ndim=1] vals, next_b
-    cdef cnp.ndarray[cnp.int64_t, ndim=1] max_actions
+    cdef cnp.ndarray[b_t, ndim=1] next_b
+    cdef cnp.ndarray[cnp.int16_t, ndim=1] max_actions, vals
     cdef int action, max_val=-2, max_val_count=16, val, i
-    vals = np.zeros(16, dtype=np.uint8)
+    vals = np.zeros(16, dtype=np.int16)
     
     for action in range(16):
         vals[action] = -2
-        if not __is_valid_action(b, action): continue
+        if __is_invalid_action(b, action): 
+            vals[action] = -3
+            continue
         next_b = get_next(b, action, player)
         if is_win(next_b, player): return action
         if is_draw(next_b): return action
@@ -297,7 +236,7 @@ cpdef inline int minimax_action(cnp.ndarray[b_t, ndim=1] b, int player, int dept
         vals[action] = val
     
     i = 0
-    max_actions = np.zeros(max_val_count, dtype=np.int64)
+    max_actions = np.zeros(max_val_count, dtype=np.int16)
     for action in range(16):
         if vals[action] == max_val:
             max_actions[i] = action
@@ -307,4 +246,3 @@ cpdef inline int minimax_action(cnp.ndarray[b_t, ndim=1] b, int player, int dept
 
 
 
-        
