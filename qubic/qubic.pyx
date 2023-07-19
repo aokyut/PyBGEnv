@@ -1,6 +1,6 @@
 # distutils: language=c++
 # distutils: extra_compile_args = ["-O3"]
-# cython: language_level=3, boundscheck=False, wraparound=True
+# cython: language_level=3, boundscheck=True, wraparound=False
 # cython: cdivision=True
 import cython
 import numpy as np
