@@ -3,6 +3,7 @@ from PyBGEnv import qubic
 import random
 import numpy as np
 
+print(qubic.action_num)
 def test_valid_actions():
     state = qubic.init()
     player = 0
@@ -17,7 +18,7 @@ def test_game():
         action = qubic.minimax_action(state, player, 0)
         action = qubic.minimax_action(state, player, 1)
         action = qubic.minimax_action(state, player, 2)
-        # action = qubic.minimax_action(state, player, 3)
+        action = qubic.minimax_action(state, player, 3)
         action = random.choice(actions)
         next_state = qubic.get_next(state, action, player)
         state = next_state
