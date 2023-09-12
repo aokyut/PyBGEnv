@@ -128,6 +128,79 @@ cpdef inline u8 is_win(cnp.ndarray[b_t, ndim=1] b, player):
         return 1
     return 0
 
+# 特定の場所を中心に探索を行うことで高速に勝利判定を行う。
+# 何でかis_winの方が早い
+cpdef inline u8 is_win_at(cnp.ndarray[b_t, ndim=1] b, int action, int player):
+    cdef u8[64] tar_arr
+    cdef int base_x, base_y, base_z, base, x, y, z, xy, yx, xz, zx, yz, zy
+    if player == 0:
+        for i in range(64):
+            tar_arr[i] = b[i]
+    else:
+        for i in range(64):
+            tar_arr[i] = b[i + 64]
+    # x方向
+    base_x = 4 * (action // 4)
+    x = tar_arr[base_x] + tar_arr[base_x+1] + tar_arr[base_x+2] + tar_arr[base_x+3]
+    if x == 1:
+        return 1
+    #if (tar_arr[base_x] & tar_arr[base_x+1] & tar_arr[base_x+2] & tar_arr[base_x+3]) == 1:
+    #    return 1
+    # y方向
+    base_y = 16 * (action // 16) + (action % 4)
+    y = tar_arr[base_y] + tar_arr[base_y+4] + tar_arr[base_y+8] + tar_arr[base_y+12]
+    #if (tar_arr[base_y] & tar_arr[base_y+4] & tar_arr[base_y+8] & tar_arr[base_y+12]) == 1:
+    #    return 1
+    # z方向
+    base_z = action % 16
+    z = tar_arr[base_z] + tar_arr[base_z+16] + tar_arr[base_z+32] + tar_arr[base_z+48]
+    #if (tar_arr[base_z] & tar_arr[base_z+16] & tar_arr[base_z+32] & tar_arr[base_z+48]) == 1:
+    #    return 1
+    
+    # xy方向
+    if (base_z % 5 == 0):
+        base = action - base_z
+        if (tar_arr[base] & tar_arr[base+5] & tar_arr[base+10] & tar_arr[base+15]) == 1:
+            return 1
+    elif (base_z % 3 == 0 and base_z != 0 and base_z != 15):
+        base = action - base_z + 3
+        if (tar_arr[base] & tar_arr[base+3] & tar_arr[base+6] & tar_arr[base+9]) == 1:
+            return 1
+    
+    # xz方向
+    if (base_y % 17 == 0):
+        base = action - base_y
+        if (tar_arr[base] & tar_arr[base+17] & tar_arr[base+34] & tar_arr[base+51]) == 1:
+            return 1
+    elif (base_y % 15 == 3):
+        base = action - base_y + 3
+        if (tar_arr[base] & tar_arr[base+15] & tar_arr[base+30] & tar_arr[base+45]) == 1:
+            return 1
+    
+    # yz方向
+    if (base_x % 20 == 0):
+        base = action - base_y
+        if (tar_arr[base] & tar_arr[base+20] & tar_arr[base+40] & tar_arr[base+60]) == 1:
+            return 1
+    elif (base_x % 12 == 0 and base_x != 0 and base_x != 60):
+        base = action - base_x + 12
+        if (tar_arr[base] & tar_arr[base+12] & tar_arr[base+24] & tar_arr[base+36]) == 1:
+            return 1
+    if (action % 21 == 0):
+        if (tar_arr[0] & tar_arr[21] & tar_arr[42] & tar_arr[63]) == 1:
+            return 1
+    if (action % 19 == 3):
+        if (tar_arr[3] & tar_arr[22] & tar_arr[41] & tar_arr[60]) == 1:
+            return 1
+    if (action % 13 == 12):
+        if (tar_arr[12] & tar_arr[25] & tar_arr[38] & tar_arr[51]) == 1:
+            return 1
+    if (tar_arr[15] & tar_arr[26] & tar_arr[37] & tar_arr[48]) == 1:
+        return 1
+    
+    return 0
+
+
 cpdef inline u8 is_draw(cnp.ndarray[b_t, ndim=1] b):
     cdef u8 s
     for i in range(128):
@@ -142,18 +215,19 @@ cpdef inline u8 is_done(cnp.ndarray[b_t, ndim=1] b, int player):
 cpdef inline cnp.ndarray[b_t, ndim=1] get_action_mask(cnp.ndarray[b_t, ndim=1] b):
     return b[48:64]
 
-# validでないactionは-1の配列[a1, a2, a3, ... , ai, -1, -1, ...]
-cpdef inline cnp.ndarray[b_t, ndim=1] valid_actions(cnp.ndarray[b_t, ndim=1] b, int player):
-    cdef cnp.ndarray[b_t, ndim=1] tar, stone
+
+cpdef inline cnp.ndarray[cnp.int64_t, ndim=1] valid_actions(cnp.ndarray[b_t, ndim=1] b, int player):
+    cdef cnp.ndarray[cnp.int64_t, ndim=1] tar
     cdef int i, j, size = 0
-    stone = b[0:64] + b[64:128]
-    for i in range(48, 64):
-        if stone[i] == 0:
-            size += 1
-    tar = np.empty(size, dtype=np.uint8)
+    cdef u8[16] mask
+    for i in range(16):
+        mask[i] = 1 - b[i + 48] - b[i + 112]
+        size += mask[i]
+    tar = np.empty(size, dtype=np.int64)
+
     j = 0
     for i in range(16):
-        if stone[i + 48] == 0:
+        if mask[i] == 1:
             tar[j] = i
             j += 1
     return tar
@@ -174,24 +248,30 @@ cpdef inline str hash(cnp.ndarray[b_t, ndim=1] b):
     cdef int i
     cdef ull pack = 0
     
-    for i in range(128):
+    for i in range(64):
         pack = (pack << 1) + b[i]
-        if i % 64 == 63:
-            s += str(pack)
-            s += ","
-            pack = 0
+    s += str(pack)
+    s += ","
+    pack = 0
+    for i in range(64, 128):
+        pack = (pack * 2) + b[i]
+    s += str(pack)
         #s += str(b[i])
     return s
 
-cdef inline u8 __is_invalid_action(cnp.ndarray[b_t, ndim=1] b, action):
+cpdef inline u8 __is_invalid_action(cnp.ndarray[b_t, ndim=1] b, action):
     return b[action + 48] | b[action + 112]
 
-cdef inline int __minimax(cnp.ndarray[b_t, ndim=1] b, int player, int rec, int depth):
-    cdef int action, val, max_val = -2
-    cdef cnp.ndarray[b_t, ndim=1] next_b
 
-    for action in range(16):
-        if __is_invalid_action(b, action): continue
+cdef inline int __minimax(cnp.ndarray[b_t, ndim=1] b, int player, int rec, int depth):
+    cdef int action, val, max_val = -2, i
+    cdef cnp.ndarray[b_t, ndim=1] next_b
+    cdef cnp.ndarray[cnp.int64_t, ndim=1] actions
+
+    actions = valid_actions(b, player)
+    for i in range(len(actions)):
+        action = actions[i]
+        #if __is_invalid_action(b, action): continue
         next_b = get_next(b, action, player)
         # 勝った時
         if is_win(next_b, player):
@@ -243,6 +323,3 @@ cpdef inline int minimax_action(cnp.ndarray[b_t, ndim=1] b, int player, int dept
             i += 1
     
     return random.choice(max_actions)
-
-
-

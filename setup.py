@@ -7,5 +7,9 @@ from numpy import get_include # cimport numpy を使うため
 
 ox = Extension("PyBGEnv.ox", sources=["ox/ox.pyx"], include_dirs=['.', get_include()])
 qubic = Extension("PyBGEnv.qubic", sources=["qubic/qubic.pyx"], include_dirs=['.', get_include()])
+gomoku = Extension("PyBGEnv.gomoku", sources=["gomoku/gomoku.pyx"], include_dirs=['.', get_include()])
+connect4 = Extension("PyBGEnv.connect4", sources=["connect4/connect4.pyx"], include_dirs=['.', get_include()])
+
 setup(name="PyBGEnv",
-    ext_modules=cythonize([ox, qubic]))
+    version="0.0.1",
+    ext_modules=cythonize([ox, qubic, connect4]))
