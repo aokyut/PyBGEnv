@@ -6,6 +6,8 @@ import cython
 import numpy as np
 import random
 cimport numpy as cnp
+from libcpp.deque cimport deque as cdeque
+
 
 ctypedef cnp.uint8_t b_t
 ctypedef unsigned char u8
@@ -202,12 +204,24 @@ cpdef inline u8 is_win_at(cnp.ndarray[b_t, ndim=1] b, int action, int player):
 
 
 cpdef inline u8 is_draw(cnp.ndarray[b_t, ndim=1] b):
-    cdef u8 s
-    for i in range(128):
+    cdef u8 s = 0
+    cdef int i
+    for i in range(48, 64):
         s += b[i]
-    if s == 64:
+    for i in range(112, 128):
+        s += b[i]
+    if s == 16:
         return 1
     return 0
+
+cpdef inline u8 sum_top(cnp.ndarray[b_t, ndim=1] b):
+    cdef u8 s = 0
+    cdef int i
+    for i in range(48, 64):
+        s += b[i]
+    for i in range(112, 128):
+        s += b[i]
+    return s
 
 cpdef inline u8 is_done(cnp.ndarray[b_t, ndim=1] b, int player):
     return is_draw(b) | is_win(b, player)
@@ -294,32 +308,30 @@ cdef inline int __minimax(cnp.ndarray[b_t, ndim=1] b, int player, int rec, int d
 cpdef inline int minimax_action(cnp.ndarray[b_t, ndim=1] b, int player, int depth):
     cdef cnp.ndarray[b_t, ndim=1] next_b
     cdef cnp.ndarray[cnp.int16_t, ndim=1] max_actions, vals
-    cdef int action, max_val=-2, max_val_count=16, val, i
+    cdef int action, max_val=-2, max_val_count=0, val, i
     vals = np.zeros(16, dtype=np.int16)
     
     for action in range(16):
-        vals[action] = -2
+        val = -2
         if __is_invalid_action(b, action): 
             vals[action] = -3
             continue
         next_b = get_next(b, action, player)
         if is_win(next_b, player): return action
         if is_draw(next_b): return action
-        if depth == 0: continue
-        val = -__minimax(next_b, 1-player, 0, depth - 1)
-        if val == 1: return action
+        if depth != 0:
+            val = -__minimax(next_b, 1-player, 0, depth - 1)
+            if val == 1: return action
         if max_val < val:
             max_val = val
             max_val_count = 1
         elif max_val == val:
             max_val_count += 1
         vals[action] = val
-    
     i = 0
     max_actions = np.zeros(max_val_count, dtype=np.int16)
     for action in range(16):
         if vals[action] == max_val:
             max_actions[i] = action
             i += 1
-    
     return random.choice(max_actions)
