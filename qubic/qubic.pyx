@@ -270,8 +270,60 @@ cpdef inline str hash(cnp.ndarray[b_t, ndim=1] b):
     for i in range(64, 128):
         pack = (pack * 2) + b[i]
     s += str(pack)
-        #s += str(b[i])
+        #s += str(b[i])c
     return s
+
+cpdef inline str hash_unicode(cnp.ndarray[b_t, ndim=1] b):
+    cdef str s = ""
+    cdef int i
+    cdef ull pack = 0
+
+    for i in range(128):
+        pack = (pack << 1) + b[i]
+        if i % 8 == 7:
+            s += chr(pack)
+            pack = 0
+    return s
+
+cpdef inline cnp.ndarray[b_t, ndim=1] transpose(cnp.ndarray[b_t, ndim=1] b):
+    cdef cnp.ndarray[b_t, ndim=1] _b
+    cdef int i, j, k
+    _b = np.zeros(128, dtype=np.uint8)
+    for i in range(4):
+        for j in range(4):
+            for k in range(4):
+                _b[i * 16 + j * 4 + k] = b[i * 16 + k * 4 + j]
+                _b[i * 16 + j * 4 + k + 64] = b[i * 16 + k * 4 + j + 64]
+    return _b
+
+cpdef inline cnp.ndarray[b_t, ndim=1] rotate(cnp.ndarray[b_t, ndim=1] b):
+    cdef cnp.ndarray[b_t, ndim=1] _b
+    cdef int i, j, k
+    _b = np.zeros(128, dtype=np.uint8)
+    for i in range(4):
+        for j in range(4):
+            for k in range(4):
+                _b[i * 16 + j * 4 + k] = b[i * 16 + k * 4 + 3 - j]
+                _b[i * 16 + j * 4 + k + 64] = b[i * 16 + k * 4 + 3 - j + 64]
+    return _b
+
+cpdef inline str unique_hash(cnp.ndarray[b_t, ndim=1] b):
+    cdef str s = ""
+    cdef str max_s = ""
+    cdef int i
+    cdef cnp.ndarray[b_t, ndim=1] rot
+    max_s = hash(b)
+    rot = rotate(b)
+    for i in range(4):
+        s = hash_unicode(rot)
+        if s > max_s:
+            max_s = s
+        s = hash_unicode(transpose(rot))
+        if s > max_s:
+            max_s = s
+        rot = rotate(rot)
+    return max_s
+    
 
 cpdef inline u8 __is_invalid_action(cnp.ndarray[b_t, ndim=1] b, action):
     return b[action + 48] | b[action + 112]
@@ -335,3 +387,24 @@ cpdef inline int minimax_action(cnp.ndarray[b_t, ndim=1] b, int player, int dept
             max_actions[i] = action
             i += 1
     return random.choice(max_actions)
+
+
+cpdef inline int has_check(cnp.ndarray[b_t, ndim=1] b, int player, int depth):
+    cdef cnp.ndarray[b_t, ndim=1] next_b
+    cdef cnp.ndarray[cnp.int16_t, ndim=1] max_actions, vals
+    cdef int action, max_val=-2, max_val_count=0, val, i
+    vals = np.zeros(16, dtype=np.int16)
+    
+    for action in range(16):
+        val = -2
+        if __is_invalid_action(b, action): 
+            vals[action] = -3
+            continue
+        next_b = get_next(b, action, player)
+        if is_win(next_b, player): return action
+        if is_draw(next_b): return action
+        if depth != 0:
+            val = -__minimax(next_b, 1-player, 0, depth - 1)
+            if val == 1: return action
+
+    return -1
