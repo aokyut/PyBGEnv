@@ -124,6 +124,39 @@ cpdef inline cnp.ndarray[cnp.int64_t, ndim=1] result(cnp.ndarray[b_t, ndim=1] b)
     else:
         return np.array([0, 0])
 
+cpdef inline cnp.ndarray[b_t, ndim=1] flip(cnp.ndarray[b_t, ndim=1] b):
+    cdef cnp.ndarray[b_t, ndim=1] _b
+    cdef int i, j, k
+    _b = np.zeros(84, dtype=np.uint8)
+    for i in range(12):
+        for j in range(7):
+            _b[i * 7 + j] = b[i * 7 + 6 - j]
+    return _b
+
+cpdef inline str hash_unicode(cnp.ndarray[b_t, ndim=1] b):
+    cdef str s = ""
+    cdef int i
+    cdef ull pack = 0
+
+    for i in range(84):
+        pack = (pack << 1) + b[i]
+        if i % 7 == 6:
+            s += chr(pack)
+            pack = 0
+    return s
+
+cpdef inline str unique_hash(cnp.ndarray[b_t, ndim=1] b):
+    cdef str s1 = ""
+    cdef str s2 = ""
+    cdef int i
+    cdef cnp.ndarray[b_t, ndim=1] flipped
+    
+    s1 = hash_unicode(b)
+    s2 = hash_unicode(flip(b))
+    if s1 > s2:
+        return s2
+    return s1
+
 cpdef inline str hash(cnp.ndarray[b_t, ndim=1] b):
     cdef str s = ""
     cdef int i
@@ -200,3 +233,59 @@ cpdef inline int minimax_action(cnp.ndarray[b_t, ndim=1] b, int player, int dept
             i += 1
     
     return random.choice(max_actions)
+
+cpdef inline cnp.ndarray[b_t, ndim=1] get_nonmate_actions(cnp.ndarray[b_t, ndim=1] b, int player, int depth):
+    cdef cnp.ndarray[b_t, ndim=1] next_b
+    cdef cnp.ndarray[cnp.int16_t, ndim=1] max_actions, vals
+    cdef int action, max_val=-2, max_val_count=16, val, i
+    vals = np.zeros(7, dtype=np.int16)
+    
+    for action in range(7):
+        vals[action] = -2
+        if __is_invalid_action(b, action): 
+            vals[action] = -3
+            continue
+        next_b = get_next(b, action, player)
+        if is_win(next_b, player): 
+            return np.array([action], dtype=np.int16)
+        if is_draw(next_b): 
+            return np.array([action], dtype=np.int16)
+        if depth == 0: continue
+        val = -__minimax(next_b, 1-player, 0, depth - 1)
+        if val == 1: 
+            return np.array([action], dtype=np.int16)
+        if max_val < val:
+            max_val = val
+            max_val_count = 1
+        elif max_val == val:
+            max_val_count += 1
+        vals[action] = val
+    
+    i = 0
+    max_actions = np.zeros(max_val_count, dtype=np.int16)
+    for action in range(7):
+        if vals[action] == max_val:
+            max_actions[i] = action
+            i += 1
+    
+    return max_actions
+
+cpdef inline int has_mate(cnp.ndarray[b_t, ndim=1] b, int player, int depth):
+    cdef cnp.ndarray[b_t, ndim=1] next_b
+    cdef cnp.ndarray[cnp.int16_t, ndim=1] max_actions, vals
+    cdef int action, max_val=-2, max_val_count=16, val, i
+    vals = np.zeros(7, dtype=np.int16)
+    
+    for action in range(7):
+        vals[action] = -2
+        if __is_invalid_action(b, action): 
+            vals[action] = -3
+            continue
+        next_b = get_next(b, action, player)
+        if is_win(next_b, player): return action
+        if is_draw(next_b): return action
+        if depth != 0:
+            val = -__minimax(next_b, 1-player, 0, depth - 1)
+            if val == 1: return action
+    
+    return -1
