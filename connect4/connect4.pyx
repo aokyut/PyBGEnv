@@ -13,7 +13,7 @@ ctypedef unsigned long long ull
 
 action_num = 7
 shift_1_mask = 0b0001111_0001111_0001111_0001111_0001111_0001111 
-shift_6_mask = 0b0000000_1111000_1111000_1111000_1111000_1111000
+shift_6_mask = 0b0000000_0000000_0000000_1111000_1111000_1111000
 
 cdef inline cnp.ndarray[b_t, ndim=1] copy(cnp.ndarray[b_t, ndim=1] b):
     cdef cnp.ndarray[b_t, ndim=1] b_
@@ -59,10 +59,35 @@ cpdef inline cnp.ndarray[b_t, ndim=1] get_next(cnp.ndarray[b_t, ndim=1] b, int a
     next_b[pos] = 1
     return next_b
 
+cpdef inline u8 _at(cnp.ndarray[b_t, ndim=1] b, u8 player, int i, int j):
+    if i < 0 or i > 5:
+        return 0
+    if j < 0 or j > 6:
+        return 0
+    return b[42 * player + i * 7 + j]
+
+cpdef inline u8 _is_win(cnp.ndarray[b_t, ndim=1] b, player):
+    cdef int i, j, count
+    for vec in ([1, 0], [0, 1], [1, 1], [1, -1]):
+        for i in range(6):
+            for j in range(7):
+                count = 0
+                for k in range(4):
+                    ii = i + k * vec[0]
+                    jj = j + k * vec[1]
+                    if _at(b, player, ii, jj) == 1:
+                        count += 1
+                        if count == 4:
+                            return 1
+                    else:
+                        count = 0
+    return 0
+    
 
 cpdef inline u8 is_win(cnp.ndarray[b_t, ndim=1] b, player):
-    cdef cnp.ndarray[b_t, ndim=1] search_board
-    cdef int i, bitboard
+    cdef int i
+    cdef ull bitboard = 0
+
     if player == 0:
         for i in range(41, -1, -1):
             bitboard = (bitboard << 1) + b[i]
@@ -83,11 +108,11 @@ cpdef inline u8 is_win_at(cnp.ndarray[b_t, ndim=1] b, int action, int player):
     pass
 
 cpdef inline u8 is_draw(cnp.ndarray[b_t, ndim=1] b):
-    cdef u8 s
+    cdef u8 s = 0
     cdef int i
     for i in range(35, 42):
         s += b[i] + b[i + 42]
-    if s == 14:
+    if s == 7:
         return 1
     return 0
 
